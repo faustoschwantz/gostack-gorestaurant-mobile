@@ -171,3 +171,15 @@ export const IconContainer = styled.View`
   border-top-right-radius: 8px;
   border-bottom-right-radius: 8px;
 `;
+
+export const ViewModalFinalized = styled.View`
+  flex: 1;
+  justify-content: center;
+  background: rgba(0,0,0,.9);
+`
+
+export const TextModalFinalized = styled.Text`
+  font-size: 24px;
+  color: #ffffff;
+  text-align: center;
+`

@@ -5,7 +5,7 @@ import React, {
   useMemo,
   useLayoutEffect,
 } from 'react';
-import { Image } from 'react-native';
+import { Image, Modal, TouchableWithoutFeedback } from 'react-native';
 
 import Icon from 'react-native-vector-icons/Feather';
 import MaterialIcon from 'react-native-vector-icons/MaterialIcons';
@@ -37,6 +37,8 @@ import {
   FinishOrderButton,
   ButtonText,
   IconContainer,
+  ViewModalFinalized,
+  TextModalFinalized,
 } from './styles';
 
 interface Params {
@@ -62,6 +64,7 @@ interface Food {
 
 const FoodDetails: React.FC = () => {
   const [food, setFood] = useState({} as Food);
+  const [isFinalized, setIsFinalized] = useState(false)
   const [extras, setExtras] = useState<Extra[]>([]);
   const [isFavorite, setIsFavorite] = useState(false);
   const [foodQuantity, setFoodQuantity] = useState(1);
@@ -73,48 +76,80 @@ const FoodDetails: React.FC = () => {
 
   useEffect(() => {
     async function loadFood(): Promise<void> {
-      // Load a specific food with extras based on routeParams id
+      const response = await api.get<Food>(`/foods/${routeParams.id}`)
+
+      if(response?.data){
+        const food = response.data;
+        setFood({...food, formattedPrice: formatValue(food.price)})
+        setExtras(food.extras.map(extra => ({...extra, quantity: 0})))
+      }
     }
 
     loadFood();
   }, [routeParams]);
 
+  useEffect(() => {
+    async function loadFavorite(): Promise<void> {
+      try {
+        const response = await api.get<Food>(`/favorites/${routeParams.id}`)
+        if(response?.data?.id)
+          setIsFavorite(true)
+      } catch { }
+    }
+
+    loadFavorite();
+  }, [routeParams]);
+
   function handleIncrementExtra(id: number): void {
-    // Increment extra quantity
+    setExtras(extras.map(extra => ({...extra, quantity : extra.id === id ? extra.quantity + 1 : extra.quantity})))
   }
 
   function handleDecrementExtra(id: number): void {
-    // Decrement extra quantity
+    setExtras(extras.map(extra => ({...extra, quantity : extra.id === id && extra.quantity > 0 ? extra.quantity - 1 : extra.quantity})))
   }
 
   function handleIncrementFood(): void {
-    // Increment food quantity
+    setFoodQuantity(foodQuantity + 1)
   }
 
   function handleDecrementFood(): void {
-    // Decrement food quantity
+    if(foodQuantity > 1)
+      setFoodQuantity(foodQuantity - 1)
   }
 
-  const toggleFavorite = useCallback(() => {
-    // Toggle if food is favorite or not
+  const toggleFavorite = useCallback(async () => {
+    if(isFavorite)
+      await api.delete(`/favorites/${food.id}`)
+    else
+      await api.post(`/favorites`, food)
+
+      setIsFavorite(!isFavorite)
   }, [isFavorite, food]);
 
   const cartTotal = useMemo(() => {
-    // Calculate cartTotal
+    const extraTotal = extras.reduce((acc, {value, quantity}) => acc + value * quantity, 0)
+    return formatValue((extraTotal + food.price) * foodQuantity)
   }, [extras, food, foodQuantity]);
 
   async function handleFinishOrder(): Promise<void> {
-    // Finish the order and save on the API
+    console.log(food)
+    await api.post('/orders', {...food, id: undefined})
+    setIsFinalized(true)
   }
 
-  // Calculate the correct icon name
+  function handlePressModalFinalized() {
+    setFood({} as Food)
+    setIsFinalized(false)
+    navigation.goBack()
+  }
+
   const favoriteIconName = useMemo(
     () => (isFavorite ? 'favorite' : 'favorite-border'),
     [isFavorite],
   );
+  
 
   useLayoutEffect(() => {
-    // Add the favorite icon on the right of the header bar
     navigation.setOptions({
       headerRight: () => (
         <MaterialIcon
@@ -128,6 +163,7 @@ const FoodDetails: React.FC = () => {
   }, [navigation, favoriteIconName, toggleFavorite]);
 
   return (
+    <>
     <Container>
       <Header />
 
@@ -210,6 +246,19 @@ const FoodDetails: React.FC = () => {
         </TotalContainer>
       </ScrollContainer>
     </Container>
+
+    <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isFinalized}
+      >
+        <TouchableWithoutFeedback onPress={handlePressModalFinalized}> 
+          <ViewModalFinalized>
+            <TextModalFinalized>Pedido Finalizado!</TextModalFinalized>
+          </ViewModalFinalized>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </>
   );
 };
 
